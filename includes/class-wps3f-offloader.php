@@ -67,7 +67,13 @@ class WPS3F_Offloader {
     }
 
     /**
-     * Queue (or requeue) upload when metadata is generated, ensuring image sizes are available.
+     * Handle offload when metadata is generated.
+     *
+     * When sync_mode is "sync_first" (default): attempt synchronous offload
+     * immediately, fall back to WP-Cron on failure.
+     *
+     * When sync_mode is "async_only": skip synchronous upload and schedule
+     * WP-Cron only.
      *
      * @param mixed $metadata
      * @param int   $attachment_id
@@ -75,10 +81,26 @@ class WPS3F_Offloader {
      */
     public function queue_attachment_offload_from_metadata($metadata, $attachment_id) {
         $attachment_id = (int) $attachment_id;
-        if ($attachment_id > 0 && $this->is_enabled()) {
-            update_post_meta($attachment_id, self::META_STATE, self::STATE_PENDING);
-            $this->set_storage_flags($attachment_id, 0, $this->has_local_copy_for_attachment($attachment_id) ? 1 : 0);
+        if ($attachment_id <= 0 || !$this->is_enabled()) {
+            return $metadata;
+        }
 
+        if (self::STATE_OFFLOADED === get_post_meta($attachment_id, self::META_STATE, true)) {
+            return $metadata;
+        }
+
+        update_post_meta($attachment_id, self::META_STATE, self::STATE_PENDING);
+        $this->set_storage_flags($attachment_id, 0, $this->has_local_copy_for_attachment($attachment_id) ? 1 : 0);
+
+        if ($this->is_sync_first()) {
+            $ok = $this->offload_attachment($attachment_id);
+
+            if (!$ok && !wp_next_scheduled(self::CRON_HOOK, array($attachment_id))) {
+                $this->logger->debug('Sync offload failed, scheduled cron retry', array('attachment_id' => $attachment_id));
+                wp_schedule_single_event(time() + 30, self::CRON_HOOK, array($attachment_id));
+            }
+        } else {
+            $this->logger->debug('Async-only mode, scheduled cron', array('attachment_id' => $attachment_id));
             if (!wp_next_scheduled(self::CRON_HOOK, array($attachment_id))) {
                 wp_schedule_single_event(time() + 5, self::CRON_HOOK, array($attachment_id));
             }
@@ -424,6 +446,13 @@ class WPS3F_Offloader {
      */
     private function is_enabled() {
         return 1 === (int) $this->options->get('enabled');
+    }
+
+    /**
+     * @return bool
+     */
+    private function is_sync_first() {
+        return 'sync_first' === (string) $this->options->get('sync_mode');
     }
 
     /**

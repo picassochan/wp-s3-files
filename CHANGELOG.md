@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2026-04-28
+
+### Added
+
+- **Offload Mode** setting (`sync_mode`) — choose between "Sync first" (default) and "Async only".
+  - Sync first: uploads to S3 immediately after file creation, falls back to WP-Cron on failure.
+  - Async only: defers all uploads to WP-Cron, matching original behavior.
+- `WPS3F_SYNC_MODE` wp-config.php constant fallback.
+
+## [0.1.4] - 2026-04-28
+
+### Added
+
+- **Debug mode** setting with detailed logging for S3 requests/responses, offload pipeline, and URL filters.
+- Debug Panel on settings page: configuration snapshot, WP-Cron status, S3 connection test, debug log viewer with clear button.
+- `WPS3F_Logger::debug()`, `get_recent_debug()`, `clear_debug_log()`, `clear_debug_cache()`.
+- `WPS3F_S3_Client::test_connection()` for admin connectivity testing.
+- `WPS3F_DEBUG` wp-config.php constant fallback.
+- `admin_post_wps3f_clear_debug_log` action.
+
+### Changed
+
+- `WPS3F_Admin` constructor now receives `WPS3F_S3_Client` for connection testing.
+- Region is now optional — can be left empty for S3-compatible services (e.g. MinIO) that do not use regions. Endpoint becomes required when Region is empty. Default region changed from `us-east-1` to empty.
+
 ## [0.1.3] - 2026-04-28
 
 ### Added
@@ -25,6 +50,9 @@ and versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Renamed `.omx` references to `.omc` (Oh My OpenCode working directory) in `.gitignore` and CI workflow.
 - `WPS3F_Admin` constructor now receives `WPS3F_S3_Client` for connection testing.
 - Region is now optional — can be left empty for S3-compatible services (e.g. MinIO) that do not use regions. Endpoint becomes required when Region is empty. Default region changed from `us-east-1` to empty.
+- Upload flow changed from async-only to **configurable sync/async offload** via new "Offload Mode" setting:
+  - **Sync first** (default): uploads to S3 immediately after file creation. Falls back to WP-Cron on failure.
+  - **Async only**: defers all uploads to WP-Cron (original behavior). Lower editor latency but files are not on S3 until cron runs.
 
 ## [0.1.2] - 2026-04-28
 
@@ -88,6 +116,8 @@ and versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 - Initial project scaffolding.
 
+[0.1.5]: https://github.com/picassochan/wp-s3-files/releases/tag/0.1.5
+[0.1.4]: https://github.com/picassochan/wp-s3-files/releases/tag/0.1.4
 [0.1.3]: https://github.com/picassochan/wp-s3-files/releases/tag/0.1.3
 [0.1.2]: https://github.com/picassochan/wp-s3-files/releases/tag/0.1.2
 [0.1.1]: https://github.com/picassochan/wp-s3-files/releases/tag/0.1.1

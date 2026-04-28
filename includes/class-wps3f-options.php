@@ -35,6 +35,7 @@ class WPS3F_Options {
             'path_prefix'              => 'wp-content/uploads',
             'max_offload_size_mb'      => 200,
             'debug'                    => 0,
+            'sync_mode'                => 'sync_first',
         );
     }
 
@@ -121,6 +122,7 @@ class WPS3F_Options {
             'path_prefix'             => $this->sanitize_path_prefix(isset($raw['path_prefix']) ? $raw['path_prefix'] : ''),
             'max_offload_size_mb'     => $this->sanitize_size_limit(isset($raw['max_offload_size_mb']) ? $raw['max_offload_size_mb'] : 200),
             'debug'                   => empty($raw['debug']) ? 0 : 1,
+            'sync_mode'               => $this->sanitize_sync_mode(isset($raw['sync_mode']) ? $raw['sync_mode'] : ''),
         );
 
         $secret = isset($raw['secret_key']) ? trim((string) $raw['secret_key']) : '';
@@ -160,6 +162,7 @@ class WPS3F_Options {
         $options['keep_local_backup']       = empty($options['keep_local_backup']) ? 0 : 1;
         $options['delete_remote_on_delete'] = empty($options['delete_remote_on_delete']) ? 0 : 1;
         $options['debug']                   = empty($options['debug']) ? 0 : 1;
+        $options['sync_mode']               = $this->sanitize_sync_mode($options['sync_mode']);
         $options['max_offload_size_mb']     = $this->sanitize_size_limit($options['max_offload_size_mb']);
 
         $options['bucket']        = (string) $options['bucket'];
@@ -194,6 +197,7 @@ class WPS3F_Options {
             'path_prefix'              => 'WPS3F_PATH_PREFIX',
             'max_offload_size_mb'      => 'WPS3F_MAX_OFFLOAD_SIZE_MB',
             'debug'                    => 'WPS3F_DEBUG',
+            'sync_mode'                => 'WPS3F_SYNC_MODE',
         );
 
         foreach ($map as $option_key => $constant_name) {
@@ -282,5 +286,18 @@ class WPS3F_Options {
         }
 
         return $value;
+    }
+
+    /**
+     * @param mixed $value
+     * @return string
+     */
+    private function sanitize_sync_mode($value) {
+        $value = trim((string) $value);
+        if (in_array($value, array('sync_first', 'async_only'), true)) {
+            return $value;
+        }
+
+        return 'sync_first';
     }
 }

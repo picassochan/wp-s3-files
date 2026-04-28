@@ -307,6 +307,22 @@ class WPS3F_Admin {
                             </td>
                         </tr>
                         <tr>
+                            <th scope="row"><?php echo esc_html__('Offload Mode', 'wp-s3-files'); ?></th>
+                            <td>
+                                <select id="wps3f_sync_mode" name="<?php echo esc_attr(WPS3F_Options::OPTION_NAME); ?>[sync_mode]">
+                                    <option value="sync_first" <?php selected('sync_first', (string) $options['sync_mode']); ?>>
+                                        <?php echo esc_html__('Sync first (recommended)', 'wp-s3-files'); ?>
+                                    </option>
+                                    <option value="async_only" <?php selected('async_only', (string) $options['sync_mode']); ?>>
+                                        <?php echo esc_html__('Async only', 'wp-s3-files'); ?>
+                                    </option>
+                                </select>
+                                <p class="description">
+                                    <?php echo esc_html__('Sync first: upload to S3 immediately after the file is created, fall back to background cron on failure. Async only: always defer to WP-Cron (lower upload latency in the editor, but files are not on S3 until cron runs).', 'wp-s3-files'); ?>
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
                             <th scope="row"><?php echo esc_html__('Debug Mode', 'wp-s3-files'); ?></th>
                             <td>
                                 <label>
