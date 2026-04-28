@@ -13,6 +13,8 @@ require_once WPS3F_PLUGIN_PATH . 'includes/class-wps3f-key-builder.php';
 require_once WPS3F_PLUGIN_PATH . 'includes/class-wps3f-s3-client.php';
 require_once WPS3F_PLUGIN_PATH . 'includes/class-wps3f-offloader.php';
 require_once WPS3F_PLUGIN_PATH . 'includes/class-wps3f-migration-service.php';
+require_once WPS3F_PLUGIN_PATH . 'includes/class-wps3f-storage-backfill-service.php';
+require_once WPS3F_PLUGIN_PATH . 'includes/class-wps3f-media-library.php';
 require_once WPS3F_PLUGIN_PATH . 'includes/class-wps3f-admin.php';
 
 class WPS3F_Plugin {
@@ -42,6 +44,16 @@ class WPS3F_Plugin {
     private $migration;
 
     /**
+     * @var WPS3F_Storage_Backfill_Service
+     */
+    private $storage_backfill;
+
+    /**
+     * @var WPS3F_Media_Library
+     */
+    private $media_library;
+
+    /**
      * @var WPS3F_Admin
      */
     private $admin;
@@ -52,7 +64,15 @@ class WPS3F_Plugin {
         $this->client    = new WPS3F_S3_Client($this->options, $this->logger);
         $this->offloader = new WPS3F_Offloader($this->options, $this->client, $this->logger);
         $this->migration = new WPS3F_Migration_Service($this->offloader, $this->logger);
-        $this->admin     = new WPS3F_Admin($this->options, $this->offloader, $this->migration, $this->logger);
+        $this->storage_backfill = new WPS3F_Storage_Backfill_Service($this->offloader, $this->logger);
+        $this->media_library    = new WPS3F_Media_Library($this->offloader);
+        $this->admin     = new WPS3F_Admin(
+            $this->options,
+            $this->offloader,
+            $this->migration,
+            $this->storage_backfill,
+            $this->logger
+        );
 
         $this->register_hooks();
     }
@@ -70,6 +90,7 @@ class WPS3F_Plugin {
     public static function deactivate() {
         wp_clear_scheduled_hook(WPS3F_Offloader::CRON_HOOK);
         wp_clear_scheduled_hook(WPS3F_Migration_Service::CRON_HOOK);
+        wp_clear_scheduled_hook(WPS3F_Storage_Backfill_Service::CRON_HOOK);
     }
 
     /**
@@ -88,6 +109,7 @@ class WPS3F_Plugin {
         add_filter('wp_calculate_image_srcset', array($this->offloader, 'filter_image_srcset'), 20, 5);
 
         add_action(WPS3F_Migration_Service::CRON_HOOK, array($this->migration, 'run_batch'));
+        add_action(WPS3F_Storage_Backfill_Service::CRON_HOOK, array($this->storage_backfill, 'run_batch'));
 
         add_action('admin_menu', array($this->admin, 'register_menu'));
         add_action('admin_init', array($this->admin, 'register_settings'));
@@ -96,6 +118,16 @@ class WPS3F_Plugin {
         add_action('admin_post_wps3f_stop_migration', array($this->admin, 'handle_stop_migration'));
         add_action('admin_post_wps3f_retry_failed_migration', array($this->admin, 'handle_retry_failed_migration'));
         add_action('admin_post_wps3f_retry_attachment', array($this->admin, 'handle_retry_single_attachment'));
+        add_action('admin_post_wps3f_start_storage_backfill', array($this->admin, 'handle_start_storage_backfill'));
+        add_action('admin_post_wps3f_stop_storage_backfill', array($this->admin, 'handle_stop_storage_backfill'));
+        add_action('admin_post_wps3f_retry_failed_storage_backfill', array($this->admin, 'handle_retry_failed_storage_backfill'));
+
+        add_action('restrict_manage_posts', array($this->media_library, 'render_upload_storage_filter'));
+        add_action('pre_get_posts', array($this->media_library, 'apply_upload_query_storage_filter'));
+        add_filter('ajax_query_attachments_args', array($this->media_library, 'apply_modal_query_storage_filter'));
+        add_filter('manage_upload_columns', array($this->media_library, 'add_storage_column'));
+        add_action('manage_media_custom_column', array($this->media_library, 'render_storage_column'), 10, 2);
+        add_action('admin_enqueue_scripts', array($this->media_library, 'enqueue_media_modal_filter_assets'));
     }
 
     /**

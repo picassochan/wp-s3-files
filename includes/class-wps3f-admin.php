@@ -24,14 +24,26 @@ class WPS3F_Admin {
     private $migration;
 
     /**
+     * @var WPS3F_Storage_Backfill_Service
+     */
+    private $storage_backfill;
+
+    /**
      * @var WPS3F_Logger
      */
     private $logger;
 
-    public function __construct(WPS3F_Options $options, WPS3F_Offloader $offloader, WPS3F_Migration_Service $migration, WPS3F_Logger $logger) {
+    public function __construct(
+        WPS3F_Options $options,
+        WPS3F_Offloader $offloader,
+        WPS3F_Migration_Service $migration,
+        WPS3F_Storage_Backfill_Service $storage_backfill,
+        WPS3F_Logger $logger
+    ) {
         $this->options   = $options;
         $this->offloader = $offloader;
         $this->migration = $migration;
+        $this->storage_backfill = $storage_backfill;
         $this->logger    = $logger;
     }
 
@@ -133,6 +145,33 @@ class WPS3F_Admin {
     }
 
     /**
+     * Start storage classification backfill.
+     */
+    public function handle_start_storage_backfill() {
+        $this->assert_admin_and_nonce('wps3f_storage_backfill_action');
+        $this->storage_backfill->start();
+        $this->redirect_with_notice('storage_backfill_started');
+    }
+
+    /**
+     * Stop storage classification backfill.
+     */
+    public function handle_stop_storage_backfill() {
+        $this->assert_admin_and_nonce('wps3f_storage_backfill_action');
+        $this->storage_backfill->stop();
+        $this->redirect_with_notice('storage_backfill_stopped');
+    }
+
+    /**
+     * Retry failed storage classification items.
+     */
+    public function handle_retry_failed_storage_backfill() {
+        $this->assert_admin_and_nonce('wps3f_storage_backfill_action');
+        $this->storage_backfill->retry_failed();
+        $this->redirect_with_notice('storage_backfill_retry_done');
+    }
+
+    /**
      * Retry a single attachment.
      */
     public function handle_retry_single_attachment() {
@@ -159,6 +198,7 @@ class WPS3F_Admin {
         $options      = $this->options->get_all();
         $masked_secret = $this->options->get_masked_secret_for_form();
         $state        = $this->migration->get_state();
+        $storage_backfill_state = $this->storage_backfill->get_state();
         $recent       = $this->logger->get_recent_errors(20);
 
         $notices = array(
@@ -166,6 +206,9 @@ class WPS3F_Admin {
             'migration_stopped'         => __('Migration stopped.', 'wp-s3-files'),
             'migration_retry_scheduled' => __('Retry for failed migration items has been scheduled.', 'wp-s3-files'),
             'attachment_retry_scheduled'=> __('Attachment retry has been scheduled.', 'wp-s3-files'),
+            'storage_backfill_started'  => __('Storage classification backfill started.', 'wp-s3-files'),
+            'storage_backfill_stopped'  => __('Storage classification backfill stopped.', 'wp-s3-files'),
+            'storage_backfill_retry_done' => __('Storage classification retry finished.', 'wp-s3-files'),
         );
 
         if (!empty($_GET['wps3f_notice'])) {
@@ -289,6 +332,35 @@ class WPS3F_Admin {
                 </form>
             </div>
 
+            <hr />
+
+            <h2><?php echo esc_html__('Storage Classification Backfill', 'wp-s3-files'); ?></h2>
+            <p><?php echo esc_html__('Backfill S3/Local classification flags for existing attachments in background batches.', 'wp-s3-files'); ?></p>
+            <p>
+                <strong><?php echo esc_html__('Status:', 'wp-s3-files'); ?></strong>
+                <?php echo !empty($storage_backfill_state['running']) ? esc_html__('Running', 'wp-s3-files') : esc_html__('Idle', 'wp-s3-files'); ?> |
+                <strong><?php echo esc_html__('Processed:', 'wp-s3-files'); ?></strong> <?php echo esc_html((string) (int) $storage_backfill_state['processed']); ?> / <?php echo esc_html((string) (int) $storage_backfill_state['total']); ?> |
+                <strong><?php echo esc_html__('Failed:', 'wp-s3-files'); ?></strong> <?php echo esc_html((string) count((array) $storage_backfill_state['failed_ids'])); ?>
+            </p>
+
+            <div style="display:flex; gap:12px; margin: 12px 0;">
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                    <?php wp_nonce_field('wps3f_storage_backfill_action'); ?>
+                    <input type="hidden" name="action" value="wps3f_start_storage_backfill" />
+                    <?php submit_button(__('Start Backfill', 'wp-s3-files'), 'secondary', 'submit', false); ?>
+                </form>
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                    <?php wp_nonce_field('wps3f_storage_backfill_action'); ?>
+                    <input type="hidden" name="action" value="wps3f_stop_storage_backfill" />
+                    <?php submit_button(__('Stop Backfill', 'wp-s3-files'), 'secondary', 'submit', false); ?>
+                </form>
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                    <?php wp_nonce_field('wps3f_storage_backfill_action'); ?>
+                    <input type="hidden" name="action" value="wps3f_retry_failed_storage_backfill" />
+                    <?php submit_button(__('Retry Failed Backfill', 'wp-s3-files'), 'secondary', 'submit', false); ?>
+                </form>
+            </div>
+
             <?php if (!empty($state['failed_ids']) && is_array($state['failed_ids'])) : ?>
                 <h3><?php echo esc_html__('Failed Attachment IDs', 'wp-s3-files'); ?></h3>
                 <p><?php echo esc_html__('Click retry to requeue individual items.', 'wp-s3-files'); ?></p>
@@ -314,6 +386,24 @@ class WPS3F_Admin {
                                 ?>
                                 <a class="button button-small" href="<?php echo esc_url($retry_url); ?>"><?php echo esc_html__('Retry', 'wp-s3-files'); ?></a>
                             </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+
+            <?php if (!empty($storage_backfill_state['failed_ids']) && is_array($storage_backfill_state['failed_ids'])) : ?>
+                <h3><?php echo esc_html__('Backfill Failed Attachment IDs', 'wp-s3-files'); ?></h3>
+                <table class="widefat striped" style="max-width: 700px;">
+                    <thead>
+                        <tr>
+                            <th><?php echo esc_html__('Attachment ID', 'wp-s3-files'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach (array_slice($storage_backfill_state['failed_ids'], 0, 50) as $attachment_id) : ?>
+                        <tr>
+                            <td><?php echo esc_html((string) (int) $attachment_id); ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

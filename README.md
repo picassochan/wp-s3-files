@@ -11,6 +11,8 @@ WordPress plugin that offloads Media Library attachments to S3-compatible object
 - Configurable local backup retention (default: disabled).
 - Configurable remote delete sync on attachment delete (default: enabled).
 - Historical migration tool (batch migration + retry failed items).
+- Media Library storage filters (`All / S3 / Local`) with default S3 scope.
+- Background backfill task for S3/Local classification flags on existing attachments.
 - Built-in i18n support (English + Simplified Chinese).
 
 ## Installation

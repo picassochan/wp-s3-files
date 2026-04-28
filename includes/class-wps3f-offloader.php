@@ -12,6 +12,8 @@ class WPS3F_Offloader {
     const META_STATE    = '_wps3f_state';
     const META_OBJECTS  = '_wps3f_objects';
     const META_ERROR    = '_wps3f_error';
+    const META_IS_S3 = '_wps3f_is_s3';
+    const META_HAS_LOCAL_COPY = '_wps3f_has_local_copy';
 
     const STATE_PENDING  = 'pending';
     const STATE_OFFLOADED = 'offloaded';
@@ -54,6 +56,7 @@ class WPS3F_Offloader {
         }
 
         update_post_meta($attachment_id, self::META_STATE, self::STATE_PENDING);
+        $this->set_storage_flags($attachment_id, 0, $this->has_local_copy_for_attachment($attachment_id) ? 1 : 0);
 
         if (!wp_next_scheduled(self::CRON_HOOK, array($attachment_id))) {
             wp_schedule_single_event(time() + 5, self::CRON_HOOK, array($attachment_id));
@@ -71,6 +74,7 @@ class WPS3F_Offloader {
         $attachment_id = (int) $attachment_id;
         if ($attachment_id > 0 && $this->is_enabled()) {
             update_post_meta($attachment_id, self::META_STATE, self::STATE_PENDING);
+            $this->set_storage_flags($attachment_id, 0, $this->has_local_copy_for_attachment($attachment_id) ? 1 : 0);
 
             if (!wp_next_scheduled(self::CRON_HOOK, array($attachment_id))) {
                 wp_schedule_single_event(time() + 5, self::CRON_HOOK, array($attachment_id));
@@ -107,6 +111,7 @@ class WPS3F_Offloader {
         }
 
         if (!$force_retry && self::STATE_OFFLOADED === get_post_meta($attachment_id, self::META_STATE, true)) {
+            $this->refresh_storage_flags($attachment_id);
             return true;
         }
 
@@ -166,9 +171,12 @@ class WPS3F_Offloader {
         update_post_meta($attachment_id, self::META_STATE, self::STATE_OFFLOADED);
         $this->logger->clear_attachment_error($attachment_id);
 
+        $has_local_copy = true;
         if (!$this->keep_local_backup()) {
             $this->delete_local_files($files);
+            $has_local_copy = $this->has_local_copy_from_files($files);
         }
+        $this->set_storage_flags($attachment_id, 1, $has_local_copy ? 1 : 0);
 
         return true;
     }
@@ -185,6 +193,7 @@ class WPS3F_Offloader {
         }
 
         update_post_meta($attachment_id, self::META_STATE, self::STATE_PENDING);
+        $this->set_storage_flags($attachment_id, 0, $this->has_local_copy_for_attachment($attachment_id) ? 1 : 0);
         if (!wp_next_scheduled(self::CRON_HOOK, array($attachment_id))) {
             wp_schedule_single_event(time() + 3, self::CRON_HOOK, array($attachment_id));
         }
@@ -329,6 +338,56 @@ class WPS3F_Offloader {
             'state'  => (string) get_post_meta($attachment_id, self::META_STATE, true),
             'error'  => (string) get_post_meta($attachment_id, self::META_ERROR, true),
             'object' => get_post_meta($attachment_id, self::META_OBJECTS, true),
+            'is_s3'  => (int) get_post_meta($attachment_id, self::META_IS_S3, true),
+            'has_local_copy' => (int) get_post_meta($attachment_id, self::META_HAS_LOCAL_COPY, true),
+        );
+    }
+
+    /**
+     * Refresh S3/local classification flags for an attachment.
+     *
+     * @param int $attachment_id
+     * @return bool
+     */
+    public function refresh_storage_flags($attachment_id) {
+        $attachment_id = (int) $attachment_id;
+        if ($attachment_id <= 0 || 'attachment' !== get_post_type($attachment_id)) {
+            return false;
+        }
+
+        $state = (string) get_post_meta($attachment_id, self::META_STATE, true);
+        $objects = get_post_meta($attachment_id, self::META_OBJECTS, true);
+        $has_remote_object = self::STATE_OFFLOADED === $state;
+        if (!$has_remote_object && is_array($objects) && !empty($objects['original']['key'])) {
+            $has_remote_object = true;
+        }
+
+        $has_local_copy = $this->has_local_copy_for_attachment($attachment_id);
+        $this->set_storage_flags($attachment_id, $has_remote_object ? 1 : 0, $has_local_copy ? 1 : 0);
+
+        return true;
+    }
+
+    /**
+     * Get storage flags for media list rendering.
+     *
+     * @param int $attachment_id
+     * @return array<string,bool>
+     */
+    public function get_storage_flags($attachment_id) {
+        $attachment_id = (int) $attachment_id;
+        $is_s3 = (int) get_post_meta($attachment_id, self::META_IS_S3, true);
+        $has_local_copy = (int) get_post_meta($attachment_id, self::META_HAS_LOCAL_COPY, true);
+
+        if ('' === get_post_meta($attachment_id, self::META_IS_S3, true) || '' === get_post_meta($attachment_id, self::META_HAS_LOCAL_COPY, true)) {
+            $this->refresh_storage_flags($attachment_id);
+            $is_s3 = (int) get_post_meta($attachment_id, self::META_IS_S3, true);
+            $has_local_copy = (int) get_post_meta($attachment_id, self::META_HAS_LOCAL_COPY, true);
+        }
+
+        return array(
+            'is_s3' => 1 === $is_s3,
+            'has_local_copy' => 1 === $has_local_copy,
         );
     }
 
@@ -514,6 +573,7 @@ class WPS3F_Offloader {
         $message       = (string) $message;
 
         $this->logger->record_attachment_error($attachment_id, $code, $message);
+        $this->set_storage_flags($attachment_id, 0, 1);
     }
 
     /**
@@ -603,5 +663,40 @@ class WPS3F_Offloader {
         }
 
         return array_values(array_unique($keys));
+    }
+
+    /**
+     * @param int $attachment_id
+     * @param int $is_s3
+     * @param int $has_local_copy
+     */
+    private function set_storage_flags($attachment_id, $is_s3, $has_local_copy) {
+        update_post_meta((int) $attachment_id, self::META_IS_S3, (int) $is_s3 ? 1 : 0);
+        update_post_meta((int) $attachment_id, self::META_HAS_LOCAL_COPY, (int) $has_local_copy ? 1 : 0);
+    }
+
+    /**
+     * @param int $attachment_id
+     * @return bool
+     */
+    private function has_local_copy_for_attachment($attachment_id) {
+        $attachment_id = (int) $attachment_id;
+        $path = get_attached_file($attachment_id);
+
+        return !empty($path) && file_exists((string) $path);
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $files
+     * @return bool
+     */
+    private function has_local_copy_from_files(array $files) {
+        foreach ($files as $file_info) {
+            if (!empty($file_info['path']) && file_exists((string) $file_info['path'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

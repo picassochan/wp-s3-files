@@ -195,3 +195,42 @@ msgstr "S3 Endpoint 无效。"
 
 msgid "Remote request failed with HTTP %d."
 msgstr "远端请求失败，HTTP 状态码：%d。"
+
+msgid "Filter by Storage"
+msgstr "按存储类型筛选"
+
+msgid "All Storage"
+msgstr "全部存储"
+
+msgid "Storage"
+msgstr "存储"
+
+msgid "S3 + Local"
+msgstr "S3 + 本地"
+
+msgid "Storage classification backfill started."
+msgstr "存储分类回填已开始。"
+
+msgid "Storage classification backfill stopped."
+msgstr "存储分类回填已停止。"
+
+msgid "Storage classification retry finished."
+msgstr "存储分类失败项重试已完成。"
+
+msgid "Storage Classification Backfill"
+msgstr "存储分类回填"
+
+msgid "Backfill S3/Local classification flags for existing attachments in background batches."
+msgstr "为现有附件分批在后台回填 S3/Local 分类标记。"
+
+msgid "Start Backfill"
+msgstr "开始回填"
+
+msgid "Stop Backfill"
+msgstr "停止回填"
+
+msgid "Retry Failed Backfill"
+msgstr "重试回填失败项"
+
+msgid "Backfill Failed Attachment IDs"
+msgstr "回填失败附件 ID"
