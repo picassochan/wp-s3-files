@@ -14,7 +14,6 @@ require_once WPS3F_PLUGIN_PATH . 'includes/class-wps3f-s3-client.php';
 require_once WPS3F_PLUGIN_PATH . 'includes/class-wps3f-offloader.php';
 require_once WPS3F_PLUGIN_PATH . 'includes/class-wps3f-migration-service.php';
 require_once WPS3F_PLUGIN_PATH . 'includes/class-wps3f-admin.php';
-require_once WPS3F_PLUGIN_PATH . 'includes/class-wps3f-updater.php';
 
 class WPS3F_Plugin {
     /**
@@ -47,11 +46,6 @@ class WPS3F_Plugin {
      */
     private $admin;
 
-    /**
-     * @var WPS3F_Updater
-     */
-    private $updater;
-
     public function __construct() {
         $this->options   = new WPS3F_Options();
         $this->logger    = new WPS3F_Logger();
@@ -59,10 +53,8 @@ class WPS3F_Plugin {
         $this->offloader = new WPS3F_Offloader($this->options, $this->client, $this->logger);
         $this->migration = new WPS3F_Migration_Service($this->offloader, $this->logger);
         $this->admin     = new WPS3F_Admin($this->options, $this->offloader, $this->migration, $this->logger);
-        $this->updater   = new WPS3F_Updater($this->logger);
 
         $this->register_hooks();
-        $this->updater->init();
     }
 
     /**
@@ -84,6 +76,8 @@ class WPS3F_Plugin {
      * Wire all actions and filters.
      */
     private function register_hooks() {
+        add_action('init', array($this, 'load_textdomain'));
+
         add_action('add_attachment', array($this->offloader, 'queue_attachment_offload'));
         add_filter('wp_generate_attachment_metadata', array($this->offloader, 'queue_attachment_offload_from_metadata'), 20, 2);
         add_action(WPS3F_Offloader::CRON_HOOK, array($this->offloader, 'process_offload_job'));
@@ -102,5 +96,16 @@ class WPS3F_Plugin {
         add_action('admin_post_wps3f_stop_migration', array($this->admin, 'handle_stop_migration'));
         add_action('admin_post_wps3f_retry_failed_migration', array($this->admin, 'handle_retry_failed_migration'));
         add_action('admin_post_wps3f_retry_attachment', array($this->admin, 'handle_retry_single_attachment'));
+    }
+
+    /**
+     * Load plugin translations from /languages directory.
+     */
+    public function load_textdomain() {
+        load_plugin_textdomain(
+            'wp-s3-files',
+            false,
+            dirname(plugin_basename(WPS3F_PLUGIN_FILE)) . '/languages'
+        );
     }
 }

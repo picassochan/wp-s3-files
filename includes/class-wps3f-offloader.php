@@ -120,7 +120,7 @@ class WPS3F_Offloader {
         foreach ($files as $file_info) {
             if ($file_info['size'] > $max_bytes) {
                 $message = sprintf(
-                    'File size exceeds max offload size (%dMB): %s',
+                    __('File size exceeds max offload size (%dMB): %s', 'wp-s3-files'),
                     (int) $this->options->get('max_offload_size_mb'),
                     basename($file_info['path'])
                 );
@@ -373,12 +373,12 @@ class WPS3F_Offloader {
         $attachment_id = (int) $attachment_id;
         $original_path = get_attached_file($attachment_id);
         if (empty($original_path) || !is_readable($original_path)) {
-            return new WP_Error('wps3f_missing_original', 'Original attachment file is missing.');
+            return new WP_Error('wps3f_missing_original', __('Original attachment file is missing.', 'wp-s3-files'));
         }
 
         $uploads = wp_get_upload_dir();
         if (empty($uploads['basedir'])) {
-            return new WP_Error('wps3f_uploads_unavailable', 'Uploads directory is unavailable.');
+            return new WP_Error('wps3f_uploads_unavailable', __('Uploads directory is unavailable.', 'wp-s3-files'));
         }
 
         $base_dir       = wp_normalize_path($uploads['basedir']);
@@ -498,7 +498,7 @@ class WPS3F_Offloader {
         }
 
         if (null === $last_error) {
-            return new WP_Error('wps3f_upload_failed', 'Upload failed after retries.');
+            return new WP_Error('wps3f_upload_failed', __('Upload failed after retries.', 'wp-s3-files'));
         }
 
         return $last_error;

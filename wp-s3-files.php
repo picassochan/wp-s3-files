@@ -7,6 +7,7 @@
  * Author: WP S3 Files
  * License: GPL-2.0-or-later
  * Text Domain: wp-s3-files
+ * Domain Path: /languages
  */
 
 if (!defined('ABSPATH')) {

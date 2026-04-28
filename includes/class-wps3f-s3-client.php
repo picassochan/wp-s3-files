@@ -33,12 +33,12 @@ class WPS3F_S3_Client {
      */
     public function put_object_from_file($key, $file_path, $content_type = 'application/octet-stream') {
         if (!is_readable($file_path)) {
-            return new WP_Error('wps3f_unreadable_file', 'Local file is not readable.');
+            return new WP_Error('wps3f_unreadable_file', __('Local file is not readable.', 'wp-s3-files'));
         }
 
         $body = file_get_contents($file_path);
         if (false === $body) {
-            return new WP_Error('wps3f_read_failed', 'Unable to read file contents.');
+            return new WP_Error('wps3f_read_failed', __('Unable to read file contents.', 'wp-s3-files'));
         }
 
         $headers = array(
@@ -216,7 +216,7 @@ class WPS3F_S3_Client {
         $endpoint   = trim((string) $this->options->get('endpoint'));
 
         if ('' === $bucket || '' === $region || '' === $access_key || '' === $secret_key) {
-            return new WP_Error('wps3f_missing_credentials', 'S3 settings are incomplete.');
+            return new WP_Error('wps3f_missing_credentials', __('S3 settings are incomplete.', 'wp-s3-files'));
         }
 
         if ('' === $endpoint) {
@@ -226,7 +226,7 @@ class WPS3F_S3_Client {
         $endpoint = untrailingslashit($endpoint);
         $host     = (string) wp_parse_url($endpoint, PHP_URL_HOST);
         if ('' === $host) {
-            return new WP_Error('wps3f_invalid_endpoint', 'S3 endpoint is invalid.');
+            return new WP_Error('wps3f_invalid_endpoint', __('S3 endpoint is invalid.', 'wp-s3-files'));
         }
 
         return array(
@@ -249,7 +249,7 @@ class WPS3F_S3_Client {
     private function http_error($code, $http_code, array $response) {
         $body       = (string) wp_remote_retrieve_body($response);
         $truncated  = substr(trim($body), 0, 400);
-        $message    = sprintf('Remote request failed with HTTP %d.', (int) $http_code);
+        $message    = sprintf(__('Remote request failed with HTTP %d.', 'wp-s3-files'), (int) $http_code);
         if ('' !== $truncated) {
             $message .= ' ' . $truncated;
         }

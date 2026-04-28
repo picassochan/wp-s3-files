@@ -1,0 +1,197 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: WP S3 Files 0.1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-28 16:30+0800\n"
+"PO-Revision-Date: 2026-04-28 16:30+0800\n"
+"Last-Translator: WP S3 Files Team\n"
+"Language-Team: zh_CN\n"
+"Language: zh_CN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: Codex\n"
+
+msgid "WP S3 Files"
+msgstr "WP S3 文件管理"
+
+msgid "Settings saved."
+msgstr "设置已保存。"
+
+msgid "Unknown error"
+msgstr "未知错误"
+
+msgid "View details"
+msgstr "查看详情"
+
+msgid "Unauthorized"
+msgstr "未授权"
+
+msgid "Migration started."
+msgstr "迁移已开始。"
+
+msgid "Migration stopped."
+msgstr "迁移已停止。"
+
+msgid "Retry for failed migration items has been scheduled."
+msgstr "失败迁移项的重试任务已加入计划。"
+
+msgid "Attachment retry has been scheduled."
+msgstr "附件重试任务已加入计划。"
+
+msgid "Offload WordPress media to S3-compatible storage. Failed uploads stay local and can be retried later."
+msgstr "将 WordPress 媒体文件卸载到兼容 S3 的对象存储。上传失败时文件会保留在本地，之后可重试。"
+
+msgid "Tip:"
+msgstr "提示："
+
+msgid "Admin-saved settings are stored in DB and take priority. wp-config.php constants are only fallback values for missing DB fields."
+msgstr "后台保存的设置存储在数据库中并优先生效。wp-config.php 常量仅在数据库字段缺失时作为兜底值。"
+
+msgid "Enable Offload"
+msgstr "启用卸载"
+
+msgid "Enable automatic S3 offload"
+msgstr "启用自动 S3 卸载"
+
+msgid "Bucket"
+msgstr "Bucket"
+
+msgid "Region"
+msgstr "Region"
+
+msgid "Endpoint"
+msgstr "Endpoint"
+
+msgid "Leave empty for AWS default endpoint. For S3-compatible providers, set a full URL like https://minio.example.com."
+msgstr "留空将使用 AWS 默认 Endpoint。若使用 S3 兼容服务，请填写完整 URL，例如 https://minio.example.com。"
+
+msgid "Access Key"
+msgstr "Access Key"
+
+msgid "Secret Key"
+msgstr "Secret Key"
+
+msgid "Leave as ******** to keep the current secret."
+msgstr "保留 ******** 可继续使用当前 Secret。"
+
+msgid "Custom CDN Domain"
+msgstr "自定义 CDN 域名"
+
+msgid "Optional. Example: https://cdn.example.com"
+msgstr "可选。例如：https://cdn.example.com"
+
+msgid "Path Prefix"
+msgstr "路径前缀"
+
+msgid "Max Offload File Size (MB)"
+msgstr "最大卸载文件大小（MB）"
+
+msgid "Files larger than this limit remain local and are marked as failed for retry or manual handling."
+msgstr "超过该限制的文件会保留在本地，并标记为失败，便于后续重试或手动处理。"
+
+msgid "Local Backup"
+msgstr "本地备份"
+
+msgid "Keep local media files after successful offload"
+msgstr "卸载成功后保留本地媒体文件"
+
+msgid "Delete Sync"
+msgstr "删除联动"
+
+msgid "Delete remote objects when attachment is deleted"
+msgstr "删除附件时同步删除远端对象"
+
+msgid "Save Settings"
+msgstr "保存设置"
+
+msgid "Historical Migration"
+msgstr "历史媒体迁移"
+
+msgid "One-click migration for existing attachments. Runs in background via WP-Cron in batches of"
+msgstr "一键迁移现有附件。通过 WP-Cron 在后台分批执行，每批"
+
+msgid "Status:"
+msgstr "状态："
+
+msgid "Running"
+msgstr "运行中"
+
+msgid "Idle"
+msgstr "空闲"
+
+msgid "Processed:"
+msgstr "已处理："
+
+msgid "Failed:"
+msgstr "失败："
+
+msgid "Start Migration"
+msgstr "开始迁移"
+
+msgid "Stop Migration"
+msgstr "停止迁移"
+
+msgid "Retry Failed"
+msgstr "重试失败项"
+
+msgid "Failed Attachment IDs"
+msgstr "失败附件 ID"
+
+msgid "Click retry to requeue individual items."
+msgstr "点击“重试”可将单个条目重新加入队列。"
+
+msgid "Attachment ID"
+msgstr "附件 ID"
+
+msgid "Action"
+msgstr "操作"
+
+msgid "Retry"
+msgstr "重试"
+
+msgid "Recent Errors"
+msgstr "最近错误"
+
+msgid "No errors recorded."
+msgstr "暂无错误记录。"
+
+msgid "Time (UTC)"
+msgstr "时间（UTC）"
+
+msgid "Code"
+msgstr "代码"
+
+msgid "Message"
+msgstr "消息"
+
+msgid "Attachment"
+msgstr "附件"
+
+msgid "File size exceeds max offload size (%dMB): %s"
+msgstr "文件大小超过最大卸载限制（%dMB）：%s"
+
+msgid "Original attachment file is missing."
+msgstr "原始附件文件不存在。"
+
+msgid "Uploads directory is unavailable."
+msgstr "上传目录不可用。"
+
+msgid "Upload failed after retries."
+msgstr "重试后上传仍失败。"
+
+msgid "Local file is not readable."
+msgstr "本地文件不可读。"
+
+msgid "Unable to read file contents."
+msgstr "无法读取文件内容。"
+
+msgid "S3 settings are incomplete."
+msgstr "S3 设置不完整。"
+
+msgid "S3 endpoint is invalid."
+msgstr "S3 Endpoint 无效。"
+
+msgid "Remote request failed with HTTP %d."
+msgstr "远端请求失败，HTTP 状态码：%d。"

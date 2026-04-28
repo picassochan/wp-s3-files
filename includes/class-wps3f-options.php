@@ -1,6 +1,6 @@
 <?php
 /**
- * Settings/options model with defaults and constant overrides.
+ * Settings/options model with defaults and optional constant fallbacks.
  */
 
 if (!defined('ABSPATH')) {
@@ -62,7 +62,7 @@ class WPS3F_Options {
         }
 
         $options = wp_parse_args($stored, self::defaults());
-        $options = $this->apply_constant_overrides($options);
+        $options = $this->apply_constant_fallbacks($options, $stored);
         $options = $this->normalize($options);
 
         $this->cache = $options;
@@ -97,7 +97,15 @@ class WPS3F_Options {
      * @return array<string,mixed>
      */
     public function sanitize_for_storage($raw, $current = null) {
-        $current = is_array($current) ? wp_parse_args($current, self::defaults()) : $this->get_all();
+        if (is_array($current)) {
+            $current = wp_parse_args($current, self::defaults());
+        } else {
+            $stored = get_option(self::OPTION_NAME, array());
+            if (!is_array($stored)) {
+                $stored = array();
+            }
+            $current = wp_parse_args($stored, self::defaults());
+        }
         $raw     = is_array($raw) ? $raw : array();
 
         $sanitized = array(
@@ -163,12 +171,13 @@ class WPS3F_Options {
     }
 
     /**
-     * Apply wp-config.php constant overrides.
+     * Apply wp-config.php constant fallbacks only when database value is missing.
      *
      * @param array<string,mixed> $options
+     * @param array<string,mixed> $stored Raw DB option array.
      * @return array<string,mixed>
      */
-    private function apply_constant_overrides(array $options) {
+    private function apply_constant_fallbacks(array $options, array $stored) {
         $map = array(
             'enabled'                  => 'WPS3F_ENABLED',
             'bucket'                   => 'WPS3F_BUCKET',
@@ -184,12 +193,21 @@ class WPS3F_Options {
         );
 
         foreach ($map as $option_key => $constant_name) {
-            if (defined($constant_name)) {
+            if (defined($constant_name) && !$this->has_stored_value($stored, $option_key)) {
                 $options[$option_key] = constant($constant_name);
             }
         }
 
         return $options;
+    }
+
+    /**
+     * @param array<string,mixed> $stored
+     * @param string              $key
+     * @return bool
+     */
+    private function has_stored_value(array $stored, $key) {
+        return array_key_exists($key, $stored);
     }
 
     /**

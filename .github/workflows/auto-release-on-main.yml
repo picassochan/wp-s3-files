@@ -1,0 +1,89 @@
+name: Auto create/update Release on main (numeric tag)
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract plugin version from main plugin file
+        id: ver
+        shell: bash
+        run: |
+          MAIN_PLUGIN_FILE="wp-s3-files.php"
+          if [ ! -f "$MAIN_PLUGIN_FILE" ]; then
+            echo "Main plugin file not found: $MAIN_PLUGIN_FILE"
+            ls -la
+            exit 1
+          fi
+
+          VERSION=$(php -r '
+            $c = file_get_contents(getenv("MAIN_PLUGIN_FILE"));
+            if (!preg_match("/^[ \t\/*#@]*Version:\s*(.+)\s*$/mi", $c, $m)) { exit(2); }
+            echo trim($m[1]);
+          ')
+
+          if [ -z "$VERSION" ]; then
+            echo "Cannot parse Version from plugin header."
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        env:
+          MAIN_PLUGIN_FILE: wp-s3-files.php
+
+      - name: Create tag (if not exists)
+        shell: bash
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          TAG="${VERSION}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skip creating tag."
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Build plugin zip
+        shell: bash
+        run: |
+          PLUGIN_SLUG="wp-s3-files"
+          ZIP_NAME="${PLUGIN_SLUG}.zip"
+
+          mkdir -p "build/${PLUGIN_SLUG}"
+          rsync -a --delete ./ "build/${PLUGIN_SLUG}/" \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude ".omx" \
+            --exclude "build" \
+            --exclude "node_modules" \
+            --exclude "tests" \
+            --exclude "*.zip"
+
+          cd build
+          zip -r "../${ZIP_NAME}" "${PLUGIN_SLUG}"
+
+      - name: Create/Update GitHub Release and upload zip
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.version }}
+          name: ${{ steps.ver.outputs.version }}
+          draft: false
+          prerelease: false
+          files: wp-s3-files.zip
+          fail_on_unmatched_files: true
