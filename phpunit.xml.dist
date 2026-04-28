@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="tests/bootstrap.php"
+         colors="true"
+         stopOnFailure="false">
+  <testsuites>
+    <testsuite name="WP S3 Files Unit">
+      <directory>tests/unit</directory>
+    </testsuite>
+  </testsuites>
+</phpunit>
