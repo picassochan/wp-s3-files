@@ -69,7 +69,7 @@ jobs:
           rsync -a --delete ./ "build/${PLUGIN_SLUG}/" \
             --exclude ".git" \
             --exclude ".github" \
-            --exclude ".omx" \
+            --exclude ".omc" \
             --exclude "build" \
             --exclude "node_modules" \
             --exclude "tests" \

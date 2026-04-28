@@ -3,7 +3,7 @@
  * Plugin Name: WP S3 Files
  * Plugin URI: https://example.com
  * Description: Offload WordPress media uploads to S3-compatible object storage with async processing and migration.
- * Version: 0.1.2
+ * Version: 0.1.3
  * Author: WP S3 Files
  * License: GPL-2.0-or-later
  * Text Domain: wp-s3-files
@@ -23,7 +23,7 @@ $updateChecker = PucFactory::buildUpdateChecker(
 );
 $updateChecker->getVcsApi()->enableReleaseAssets();
 
-define('WPS3F_VERSION', '0.1.2');
+define('WPS3F_VERSION', '0.1.3');
 define('WPS3F_PLUGIN_FILE', __FILE__);
 define('WPS3F_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('WPS3F_PLUGIN_URL', plugin_dir_url(__FILE__));
