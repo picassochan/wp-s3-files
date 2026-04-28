@@ -19,6 +19,11 @@ class WPS3F_Admin {
     private $offloader;
 
     /**
+     * @var WPS3F_S3_Client
+     */
+    private $s3_client;
+
+    /**
      * @var WPS3F_Migration_Service
      */
     private $migration;
@@ -36,15 +41,17 @@ class WPS3F_Admin {
     public function __construct(
         WPS3F_Options $options,
         WPS3F_Offloader $offloader,
+        WPS3F_S3_Client $s3_client,
         WPS3F_Migration_Service $migration,
         WPS3F_Storage_Backfill_Service $storage_backfill,
         WPS3F_Logger $logger
     ) {
-        $this->options   = $options;
-        $this->offloader = $offloader;
-        $this->migration = $migration;
+        $this->options         = $options;
+        $this->offloader       = $offloader;
+        $this->s3_client       = $s3_client;
+        $this->migration       = $migration;
         $this->storage_backfill = $storage_backfill;
-        $this->logger    = $logger;
+        $this->logger          = $logger;
     }
 
     /**
@@ -81,6 +88,7 @@ class WPS3F_Admin {
         $current   = get_option(WPS3F_Options::OPTION_NAME, array());
         $sanitized = $this->options->sanitize_for_storage($input, is_array($current) ? $current : array());
         $this->options->clear_cache();
+        $this->logger->clear_debug_cache();
 
         add_settings_error('wps3f_messages', 'wps3f_saved', __('Settings saved.', 'wp-s3-files'), 'updated');
 
@@ -298,6 +306,16 @@ class WPS3F_Admin {
                                 </label>
                             </td>
                         </tr>
+                        <tr>
+                            <th scope="row"><?php echo esc_html__('Debug Mode', 'wp-s3-files'); ?></th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="<?php echo esc_attr(WPS3F_Options::OPTION_NAME); ?>[debug]" value="1" <?php checked(1, (int) $options['debug']); ?> />
+                                    <?php echo esc_html__('Enable debug logging (S3 requests/responses, offload pipeline, URL filters)', 'wp-s3-files'); ?>
+                                </label>
+                                <p class="description"><?php echo esc_html__('When enabled, detailed operation logs are written to the debug log and visible in the Debug Panel below. Increases storage usage.', 'wp-s3-files'); ?></p>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
                 <?php submit_button(__('Save Settings', 'wp-s3-files')); ?>
@@ -437,8 +455,147 @@ class WPS3F_Admin {
                     </tbody>
                 </table>
             <?php endif; ?>
+
+            <hr />
+            <h2><?php echo esc_html__('Debug Panel', 'wp-s3-files'); ?></h2>
+
+            <h3><?php echo esc_html__('Configuration Snapshot', 'wp-s3-files'); ?></h3>
+            <table class="widefat striped" style="max-width: 700px;">
+                <tbody>
+                <?php
+                $snap_fields = array(
+                    'enabled'                 => __('Enabled', 'wp-s3-files'),
+                    'bucket'                  => __('Bucket', 'wp-s3-files'),
+                    'region'                  => __('Region', 'wp-s3-files'),
+                    'endpoint'                => __('Endpoint', 'wp-s3-files'),
+                    'access_key'              => __('Access Key', 'wp-s3-files'),
+                    'custom_domain'           => __('Custom Domain', 'wp-s3-files'),
+                    'path_prefix'             => __('Path Prefix', 'wp-s3-files'),
+                    'max_offload_size_mb'     => __('Max Size (MB)', 'wp-s3-files'),
+                    'keep_local_backup'       => __('Keep Local', 'wp-s3-files'),
+                    'delete_remote_on_delete' => __('Delete Sync', 'wp-s3-files'),
+                    'debug'                   => __('Debug Mode', 'wp-s3-files'),
+                );
+                foreach ($snap_fields as $key => $label) :
+                    $val = isset($options[$key]) ? $options[$key] : '-';
+                    if ('access_key' === $key && '' !== (string) $val) {
+                        $val = substr((string) $val, 0, 4) . '...';
+                    }
+                    if ('secret_key' === $key) {
+                        $val = $val ? '••••' : '(empty)';
+                    }
+                    ?>
+                    <tr>
+                        <td style="width:200px;"><strong><?php echo esc_html($label); ?></strong></td>
+                        <td><?php echo esc_html((string) $val); ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+
+            <h3><?php echo esc_html__('WP-Cron Status', 'wp-s3-files'); ?></h3>
+            <?php
+            $cron_hooks = array(
+                WPS3F_Offloader::CRON_HOOK                => __('Offload queue', 'wp-s3-files'),
+                WPS3F_Migration_Service::CRON_HOOK        => __('Migration batch', 'wp-s3-files'),
+                WPS3F_Storage_Backfill_Service::CRON_HOOK  => __('Storage backfill', 'wp-s3-files'),
+            );
+            $any_cron = false;
+            ?>
+            <table class="widefat striped" style="max-width: 700px;">
+                <thead>
+                    <tr>
+                        <th><?php echo esc_html__('Hook', 'wp-s3-files'); ?></th>
+                        <th><?php echo esc_html__('Label', 'wp-s3-files'); ?></th>
+                        <th><?php echo esc_html__('Next Run', 'wp-s3-files'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($cron_hooks as $hook => $label) :
+                    $next = wp_next_scheduled($hook);
+                    $any_cron = $any_cron || (bool) $next;
+                    ?>
+                    <tr>
+                        <td><code><?php echo esc_html($hook); ?></code></td>
+                        <td><?php echo esc_html($label); ?></td>
+                        <td><?php echo $next ? esc_html(gmdate('Y-m-d H:i:s', (int) $next) . ' UTC') : '—'; ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+
+            <h3><?php echo esc_html__('S3 Connection Test', 'wp-s3-files'); ?></h3>
+            <?php
+            $test_result = null;
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            if (!empty($_GET['wps3f_test_connection'])) {
+                $test_result = $this->s3_client->test_connection();
+            }
+            ?>
+            <p>
+                <a class="button" href="<?php echo esc_url(add_query_arg('wps3f_test_connection', '1', admin_url('options-general.php?page=wps3f-settings'))); ?>">
+                    <?php echo esc_html__('Test Connection', 'wp-s3-files'); ?>
+                </a>
+            </p>
+            <?php if (null !== $test_result) : ?>
+                <?php if (true === $test_result) : ?>
+                    <div class="notice notice-success inline"><p><?php echo esc_html__('Connection test passed.', 'wp-s3-files'); ?></p></div>
+                <?php else : ?>
+                    <div class="notice notice-error inline"><p><strong><?php echo esc_html__('Connection test failed:', 'wp-s3-files'); ?></strong> <?php echo esc_html($test_result->get_error_message()); ?></p></div>
+                <?php endif; ?>
+            <?php endif; ?>
+
+            <h3><?php echo esc_html__('Debug Log', 'wp-s3-files'); ?></h3>
+            <?php
+            $debug_logs = $this->logger->get_recent_debug(100);
+            if (!empty($debug_logs)) :
+                ?>
+                <p>
+                    <a class="button" href="<?php echo esc_url(wp_nonce_url(admin_url('admin-post.php?action=wps3f_clear_debug_log'), 'wps3f_clear_debug_log')); ?>">
+                        <?php echo esc_html__('Clear Debug Log', 'wp-s3-files'); ?>
+                    </a>
+                </p>
+                <table class="widefat striped">
+                    <thead>
+                        <tr>
+                            <th style="width:170px;"><?php echo esc_html__('Time (UTC)', 'wp-s3-files'); ?></th>
+                            <th><?php echo esc_html__('Message', 'wp-s3-files'); ?></th>
+                            <th><?php echo esc_html__('Context', 'wp-s3-files'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($debug_logs as $entry) : ?>
+                        <tr>
+                            <td style="white-space:nowrap;"><?php echo esc_html(isset($entry['time']) ? (string) $entry['time'] : ''); ?></td>
+                            <td><?php echo esc_html(isset($entry['message']) ? (string) $entry['message'] : ''); ?></td>
+                            <td><pre style="margin:0;white-space:pre-wrap;font-size:11px;"><?php echo esc_html(isset($entry['context']) ? wp_json_encode($entry['context'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : ''); ?></pre></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php else : ?>
+                <p><?php echo esc_html__('No debug log entries. Enable debug mode and perform some operations to generate logs.', 'wp-s3-files'); ?></p>
+            <?php endif; ?>
         </div>
         <?php
+    }
+
+    /**
+     * Clear the debug log.
+     */
+    public function handle_clear_debug_log() {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('Unauthorized', 'wp-s3-files'));
+        }
+        check_admin_referer('wps3f_clear_debug_log');
+
+        $this->logger->clear_debug_log();
+
+        wp_safe_redirect(add_query_arg(
+            array('page' => 'wps3f-settings'),
+            admin_url('options-general.php')
+        ));
+        exit;
     }
 
     /**

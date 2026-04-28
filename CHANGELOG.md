@@ -7,9 +7,23 @@ and versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [0.1.3] - 2026-04-28
 
+### Added
+
+- **Debug mode** — new `debug` setting (default off). When enabled, logs all S3 requests/responses (URL, headers, payload size, elapsed time, status code, response body prefix), offload pipeline events (queue, start, complete, skip), URL filter replacements, and remote delete operations.
+- `WPS3F_Logger::debug()` — writes to both PHP `error_log` and a dedicated `wps3f_debug_log` WP option buffer (max 200 entries), only when debug mode is active.
+- `WPS3F_S3_Client::test_connection()` — new method for admin connectivity testing.
+- **Debug Panel** on the settings page with four sections:
+  - Configuration Snapshot — read-only view of all settings (access key partially masked).
+  - WP-Cron Status — shows next scheduled run for offload, migration, and backfill hooks.
+  - S3 Connection Test — button that calls `test_connection()` and displays pass/fail.
+  - Debug Log — last 100 debug entries with timestamp, message, and JSON context; includes a "Clear Debug Log" button.
+- `admin_post_wps3f_clear_debug_log` action for clearing the debug log buffer.
+- `WPS3F_DEBUG` wp-config.php constant fallback for the debug setting.
+
 ### Changed
 
 - Renamed `.omx` references to `.omc` (Oh My OpenCode working directory) in `.gitignore` and CI workflow.
+- `WPS3F_Admin` constructor now receives `WPS3F_S3_Client` for connection testing.
 
 ## [0.1.2] - 2026-04-28
 

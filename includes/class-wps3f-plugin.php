@@ -69,6 +69,7 @@ class WPS3F_Plugin {
         $this->admin     = new WPS3F_Admin(
             $this->options,
             $this->offloader,
+            $this->client,
             $this->migration,
             $this->storage_backfill,
             $this->logger
@@ -121,6 +122,7 @@ class WPS3F_Plugin {
         add_action('admin_post_wps3f_start_storage_backfill', array($this->admin, 'handle_start_storage_backfill'));
         add_action('admin_post_wps3f_stop_storage_backfill', array($this->admin, 'handle_stop_storage_backfill'));
         add_action('admin_post_wps3f_retry_failed_storage_backfill', array($this->admin, 'handle_retry_failed_storage_backfill'));
+        add_action('admin_post_wps3f_clear_debug_log', array($this->admin, 'handle_clear_debug_log'));
 
         add_action('restrict_manage_posts', array($this->media_library, 'render_upload_storage_filter'));
         add_action('pre_get_posts', array($this->media_library, 'apply_upload_query_storage_filter'));

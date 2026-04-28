@@ -34,6 +34,7 @@ class WPS3F_Options {
             'delete_remote_on_delete'  => 1,
             'path_prefix'              => 'wp-content/uploads',
             'max_offload_size_mb'      => 200,
+            'debug'                    => 0,
         );
     }
 
@@ -119,6 +120,7 @@ class WPS3F_Options {
             'delete_remote_on_delete' => empty($raw['delete_remote_on_delete']) ? 0 : 1,
             'path_prefix'             => $this->sanitize_path_prefix(isset($raw['path_prefix']) ? $raw['path_prefix'] : ''),
             'max_offload_size_mb'     => $this->sanitize_size_limit(isset($raw['max_offload_size_mb']) ? $raw['max_offload_size_mb'] : 200),
+            'debug'                   => empty($raw['debug']) ? 0 : 1,
         );
 
         $secret = isset($raw['secret_key']) ? trim((string) $raw['secret_key']) : '';
@@ -157,6 +159,7 @@ class WPS3F_Options {
         $options['enabled']                 = empty($options['enabled']) ? 0 : 1;
         $options['keep_local_backup']       = empty($options['keep_local_backup']) ? 0 : 1;
         $options['delete_remote_on_delete'] = empty($options['delete_remote_on_delete']) ? 0 : 1;
+        $options['debug']                   = empty($options['debug']) ? 0 : 1;
         $options['max_offload_size_mb']     = $this->sanitize_size_limit($options['max_offload_size_mb']);
 
         $options['bucket']        = (string) $options['bucket'];
@@ -190,6 +193,7 @@ class WPS3F_Options {
             'delete_remote_on_delete'  => 'WPS3F_DELETE_REMOTE_ON_DELETE',
             'path_prefix'              => 'WPS3F_PATH_PREFIX',
             'max_offload_size_mb'      => 'WPS3F_MAX_OFFLOAD_SIZE_MB',
+            'debug'                    => 'WPS3F_DEBUG',
         );
 
         foreach ($map as $option_key => $constant_name) {

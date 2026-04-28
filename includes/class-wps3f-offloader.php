@@ -52,11 +52,14 @@ class WPS3F_Offloader {
         }
 
         if (!$this->is_enabled()) {
+            $this->logger->debug('Offload skipped: plugin disabled', array('attachment_id' => $attachment_id));
             return;
         }
 
         update_post_meta($attachment_id, self::META_STATE, self::STATE_PENDING);
         $this->set_storage_flags($attachment_id, 0, $this->has_local_copy_for_attachment($attachment_id) ? 1 : 0);
+
+        $this->logger->debug('Queued attachment for offload', array('attachment_id' => $attachment_id));
 
         if (!wp_next_scheduled(self::CRON_HOOK, array($attachment_id))) {
             wp_schedule_single_event(time() + 5, self::CRON_HOOK, array($attachment_id));
@@ -107,10 +110,12 @@ class WPS3F_Offloader {
         }
 
         if (!$this->is_enabled()) {
+            $this->logger->debug('Offload skipped: plugin disabled', array('attachment_id' => $attachment_id));
             return false;
         }
 
         if (!$force_retry && self::STATE_OFFLOADED === get_post_meta($attachment_id, self::META_STATE, true)) {
+            $this->logger->debug('Offload skipped: already offloaded', array('attachment_id' => $attachment_id));
             $this->refresh_storage_flags($attachment_id);
             return true;
         }
@@ -120,6 +125,11 @@ class WPS3F_Offloader {
             $this->mark_failed($attachment_id, 'wps3f_collect_files_failed', $files->get_error_message());
             return false;
         }
+
+        $this->logger->debug('Starting offload', array(
+            'attachment_id' => $attachment_id,
+            'file_count'    => count($files),
+        ));
 
         $max_bytes = $this->max_offload_bytes();
         foreach ($files as $file_info) {
@@ -178,6 +188,12 @@ class WPS3F_Offloader {
         }
         $this->set_storage_flags($attachment_id, 1, $has_local_copy ? 1 : 0);
 
+        $this->logger->debug('Offload complete', array(
+            'attachment_id'   => $attachment_id,
+            'files_uploaded'  => count($uploaded_keys),
+            'has_local_copy'  => $has_local_copy,
+        ));
+
         return true;
     }
 
@@ -215,6 +231,11 @@ class WPS3F_Offloader {
         }
 
         $keys = $this->extract_all_keys($objects);
+        $this->logger->debug('Deleting remote objects', array(
+            'attachment_id' => (int) $attachment_id,
+            'key_count'     => count($keys),
+        ));
+
         foreach ($keys as $key) {
             $result = $this->client->delete_object($key);
             if (is_wp_error($result)) {
@@ -243,7 +264,14 @@ class WPS3F_Offloader {
             return $url;
         }
 
-        return $this->client->build_public_url($objects['original']['key']);
+        $s3_url = $this->client->build_public_url($objects['original']['key']);
+        $this->logger->debug('filter_attachment_url', array(
+            'attachment_id' => (int) $attachment_id,
+            'original_url'  => $url,
+            's3_url'        => $s3_url,
+        ));
+
+        return $s3_url;
     }
 
     /**

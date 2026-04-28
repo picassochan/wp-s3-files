@@ -24,6 +24,34 @@ class WPS3F_S3_Client {
     }
 
     /**
+     * Test connectivity by performing a HEAD-like request to the bucket.
+     *
+     * @return true|WP_Error
+     */
+    public function test_connection() {
+        $credentials = $this->resolve_credentials();
+        if (is_wp_error($credentials)) {
+            return $credentials;
+        }
+
+        $response = $this->signed_request('GET', '', '', array());
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $code = (int) wp_remote_retrieve_response_code($response);
+        // Most S3 implementations return 200 for list, or various codes for empty bucket.
+        if ($code >= 200 && $code < 500) {
+            return true;
+        }
+
+        return new WP_Error(
+            'wps3f_connection_test_failed',
+            sprintf(__('Connection test returned HTTP %d.', 'wp-s3-files'), $code)
+        );
+    }
+
+    /**
      * Upload file to object storage.
      *
      * @param string $key
@@ -194,7 +222,16 @@ class WPS3F_S3_Client {
             $http_headers[$key_name] = $value;
         }
 
-        return wp_remote_request(
+        $this->logger->debug('S3 request', array(
+            'method'  => $method,
+            'url'     => $url,
+            'key'     => $key,
+            'headers' => array_map(function ($v) { return is_string($v) ? $v : ''; }, $http_headers),
+            'payload_size' => strlen($payload),
+        ));
+
+        $start   = microtime(true);
+        $result  = wp_remote_request(
             $url,
             array(
                 'method'  => $method,
@@ -203,6 +240,29 @@ class WPS3F_S3_Client {
                 'timeout' => 120,
             )
         );
+        $elapsed = round((microtime(true) - $start) * 1000);
+
+        if (is_wp_error($result)) {
+            $this->logger->debug('S3 response error', array(
+                'method'     => $method,
+                'key'        => $key,
+                'elapsed_ms' => $elapsed,
+                'error'      => $result->get_error_message(),
+            ));
+        } else {
+            $resp_code = (int) wp_remote_retrieve_response_code($result);
+            $resp_body = substr((string) wp_remote_retrieve_body($result), 0, 500);
+
+            $this->logger->debug('S3 response', array(
+                'method'      => $method,
+                'key'         => $key,
+                'elapsed_ms'  => $elapsed,
+                'status'      => $resp_code,
+                'body_prefix' => $resp_body,
+            ));
+        }
+
+        return $result;
     }
 
     /**
