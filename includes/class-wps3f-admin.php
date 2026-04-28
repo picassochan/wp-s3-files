@@ -256,7 +256,7 @@ class WPS3F_Admin {
                             <th scope="row"><label for="wps3f_endpoint"><?php echo esc_html__('Endpoint', 'wp-s3-files'); ?></label></th>
                             <td>
                                 <input id="wps3f_endpoint" class="regular-text" type="url" name="<?php echo esc_attr(WPS3F_Options::OPTION_NAME); ?>[endpoint]" value="<?php echo esc_attr((string) $options['endpoint']); ?>" />
-                                <p class="description"><?php echo esc_html__('Leave empty for AWS default endpoint. For S3-compatible providers, set a full URL like https://minio.example.com.', 'wp-s3-files'); ?></p>
+                                <p class="description"><?php echo esc_html__('Leave empty for AWS default endpoint. Required when Region is empty. For S3-compatible providers, set a full URL like https://minio.example.com.', 'wp-s3-files'); ?></p>
                             </td>
                         </tr>
                         <tr>

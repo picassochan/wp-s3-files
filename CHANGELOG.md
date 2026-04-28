@@ -24,6 +24,7 @@ and versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 - Renamed `.omx` references to `.omc` (Oh My OpenCode working directory) in `.gitignore` and CI workflow.
 - `WPS3F_Admin` constructor now receives `WPS3F_S3_Client` for connection testing.
+- Region is now optional — can be left empty for S3-compatible services (e.g. MinIO) that do not use regions. Endpoint becomes required when Region is empty. Default region changed from `us-east-1` to empty.
 
 ## [0.1.2] - 2026-04-28
 

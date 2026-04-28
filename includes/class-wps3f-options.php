@@ -25,7 +25,7 @@ class WPS3F_Options {
         return array(
             'enabled'                  => 1,
             'bucket'                   => '',
-            'region'                   => 'us-east-1',
+            'region'                   => '',
             'endpoint'                 => '',
             'access_key'               => '',
             'secret_key'               => '',

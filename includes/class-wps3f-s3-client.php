@@ -133,7 +133,7 @@ class WPS3F_S3_Client {
         $endpoint = (string) $this->options->get('endpoint');
         $region   = (string) $this->options->get('region');
 
-        if ('' === $endpoint) {
+        if ('' === $endpoint && '' !== $region) {
             $endpoint = 'https://s3.' . $region . '.amazonaws.com';
         }
 
@@ -275,12 +275,16 @@ class WPS3F_S3_Client {
         $secret_key = trim((string) $this->options->get('secret_key'));
         $endpoint   = trim((string) $this->options->get('endpoint'));
 
-        if ('' === $bucket || '' === $region || '' === $access_key || '' === $secret_key) {
+        if ('' === $bucket || '' === $access_key || '' === $secret_key) {
             return new WP_Error('wps3f_missing_credentials', __('S3 settings are incomplete.', 'wp-s3-files'));
         }
 
         if ('' === $endpoint) {
-            $endpoint = 'https://s3.' . $region . '.amazonaws.com';
+            if ('' !== $region) {
+                $endpoint = 'https://s3.' . $region . '.amazonaws.com';
+            } else {
+                return new WP_Error('wps3f_missing_endpoint', __('Endpoint is required when Region is empty.', 'wp-s3-files'));
+            }
         }
 
         $endpoint = untrailingslashit($endpoint);
