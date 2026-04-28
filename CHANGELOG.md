@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2026-04-28
+
+### Fixed
+
+- Minor improvements to S3 upload progress indicator timing and badge rendering.
+
 ## [0.1.6] - 2026-04-28
+
+### Added
+
+- **S3 upload progress indicator** in the media modal — when a file is uploaded, a semi-transparent overlay with an indeterminate progress bar and "Uploading to S3…" text covers the thumbnail. The overlay transitions to a green ✓ "Uploaded to S3" or red "S3 upload failed" badge on completion.
+- AJAX polling endpoint (`wp_ajax_wps3f_poll_status`) that checks attachment state every 2 seconds for async-mode uploads.
+- CSS animations for the progress overlay (pulse + indeterminate bar).
 
 ### Changed
 
@@ -131,6 +143,7 @@ and versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 - Initial project scaffolding.
 
+[0.1.7]: https://github.com/picassochan/wp-s3-files/releases/tag/0.1.7
 [0.1.6]: https://github.com/picassochan/wp-s3-files/releases/tag/0.1.6
 [0.1.5]: https://github.com/picassochan/wp-s3-files/releases/tag/0.1.5
 [0.1.4]: https://github.com/picassochan/wp-s3-files/releases/tag/0.1.4

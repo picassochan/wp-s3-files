@@ -419,6 +419,153 @@ CSS;
 })(jQuery);
 JS;
         wp_add_inline_script('media-views', $badge_script);
+
+        // AJAX polling endpoint for S3 upload status + upload progress overlay.
+        $ajax_url = admin_url('admin-ajax.php?action=wps3f_poll_status');
+        $nonce    = wp_create_nonce('wps3f_poll_status');
+        $i18n     = array(
+            'uploading' => __('Uploading to S3…', 'wp-s3-files'),
+            'success'   => __('Uploaded to S3', 'wp-s3-files'),
+            'failed'    => __('S3 upload failed', 'wp-s3-files'),
+            'pending'   => __('Pending', 'wp-s3-files'),
+        );
+        $i18n_json = wp_json_encode($i18n);
+
+        $progress_script = <<<JS
+(function($){
+    if (window.wps3fProgressLoaded) return;
+    window.wps3fProgressLoaded = true;
+
+    var ajaxUrl = '{$ajax_url}';
+    var nonce   = '{$nonce}';
+    var i18n    = {$i18n_json} || {};
+    var pollTimers = {};
+
+    function pollStatus(ids) {
+        if (!ids.length) return;
+        $.post(ajaxUrl, { nonce: nonce, ids: ids }, function(resp) {
+            if (!resp || !resp.data) return;
+            var remaining = [];
+            $.each(resp.data, function(id, info) {
+                var \$el = $('.attachment[data-id="' + id + '"]');
+                if (info.state === 'offloaded') {
+                    updateProgress(\$el, 'success', i18n.success);
+                    if (\$el.length && \$el.data('wps3fModel')) {
+                        \$el.data('wps3fModel').set('wps3f', {state:'offloaded', is_s3:true, has_local:info.has_local, label: info.has_local ? 'S3 + Local' : 'S3', error:''});
+                    }
+                } else if (info.state === 'failed') {
+                    updateProgress(\$el, 'failed', i18n.failed);
+                } else {
+                    remaining.push(id);
+                }
+            });
+            if (remaining.length) {
+                setTimeout(function(){ pollStatus(remaining); }, 2000);
+            }
+        });
+    }
+
+    function updateProgress(\$el, status, text) {
+        var \$overlay = \$el.find('.wps3f-progress');
+        if (status === 'success') {
+            \$overlay.removeClass('wps3f-progress--uploading').addClass('wps3f-progress--done');
+            \$overlay.html('<span class="wps3f-progress__check">&#10003;</span> ' + text);
+            setTimeout(function(){ \$overlay.fadeOut(300, function(){ \$overlay.remove(); }); }, 3000);
+        } else if (status === 'failed') {
+            \$overlay.removeClass('wps3f-progress--uploading').addClass('wps3f-progress--failed');
+            \$overlay.text(text);
+        }
+    }
+
+    function addProgressOverlay(\$el) {
+        if (\$el.find('.wps3f-progress').length) return;
+        var \$thumb = \$el.find('.thumbnail');
+        if (!\$thumb.length) return;
+        \$thumb.css('position','relative');
+        \$thumb.append('<div class="wps3f-progress wps3f-progress--uploading"><div class="wps3f-progress__bar"><div class="wps3f-progress__fill"></div></div><span class="wps3f-progress__text">' + i18n.uploading + '</span></div>');
+    }
+
+    // Hook into the WP Uploader (plupload) to detect when uploads finish.
+    if (typeof wp !== 'undefined' && wp.Uploader) {
+        $(document).on('uploader:ready', function() {
+            if (!wp.media.frame || !wp.media.frame.uploader) return;
+            var uploader = wp.media.frame.uploader.uploader;
+            if (!uploader || !uploader.bind) return;
+
+            // Track files being uploaded.
+            var pendingIds = [];
+
+            // When WP finishes creating an attachment from upload.
+            $(document).on('attachment:ready', function(e, model) {
+                var wps3f = model.get('wps3f');
+                if (wps3f && wps3f.state === 'offloaded') return; // Already done (sync).
+                var id = model.get('id');
+                var \$el = $('.attachment[data-id="' + id + '"]');
+                if (\$el.length) {
+                    \$el.data('wps3fModel', model);
+                    addProgressOverlay(\$el);
+                    pendingIds.push(id);
+                }
+            });
+
+            // Start polling after a short delay to let sync uploads finish first.
+            $(document).on('attachment:ready', function() {
+                if (!pendingIds.length) return;
+                var ids = pendingIds.slice();
+                setTimeout(function(){
+                    // Re-check which are still pending before polling.
+                    var stillPending = [];
+                    $.each(ids, function(_, id) {
+                        var state = '';
+                        var \$el = $('.attachment[data-id="' + id + '"]');
+                        if (\$el.length && \$el.data('wps3fModel')) {
+                            var w = \$el.data('wps3fModel').get('wps3f');
+                            if (w) state = w.state;
+                        }
+                        if (state !== 'offloaded' && state !== 'failed') {
+                            stillPending.push(id);
+                        }
+                    });
+                    if (stillPending.length) pollStatus(stillPending);
+                }, 1500);
+            });
+        });
+    }
+})(jQuery);
+JS;
+        wp_add_inline_script('media-views', $progress_script);
+
+        // Progress bar CSS.
+        $progress_css = <<<'CSS'
+.wps3f-progress{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;border-radius:4px;padding:8px}.wps3f-progress--uploading{animation:wps3f-pulse 2s ease-in-out infinite}.wps3f-progress__bar{width:80%;height:4px;background:rgba(255,255,255,.3);border-radius:2px;overflow:hidden;margin-bottom:6px}.wps3f-progress__fill{height:100%;background:#72aee6;border-radius:2px;animation:wps3f-indeterminate 1.5s ease-in-out infinite;width:30%}.wps3f-progress__text{color:#fff;font-size:11px;font-weight:500;text-shadow:0 1px 2px rgba(0,0,0,.4);white-space:nowrap}.wps3f-progress__check{font-weight:700}.wps3f-progress--done{background:rgba(0,163,42,.7);animation:none}.wps3f-progress--done .wps3f-progress__bar{display:none}.wps3f-progress--failed{background:rgba(214,54,56,.7);animation:none}.wps3f-progress--failed .wps3f-progress__bar{display:none}@keyframes wps3f-pulse{0%,100%{opacity:1}50%{opacity:.7}}@keyframes wps3f-indeterminate{0%{transform:translateX(-100%)}100%{transform:translateX(370%)}}
+CSS;
+        wp_add_inline_style('media-views', $progress_css);
+    }
+
+    /**
+     * AJAX handler: poll S3 upload status for given attachment IDs.
+     */
+    public function ajax_poll_status() {
+        check_ajax_referer('wps3f_poll_status', 'nonce');
+
+        if (!current_user_can('upload_files')) {
+            wp_send_json_error('Unauthorized');
+        }
+
+        $ids = isset($_POST['ids']) && is_array($_POST['ids']) ? array_map('intval', $_POST['ids']) : array();
+        $ids = array_filter($ids, function ($id) { return $id > 0; });
+
+        $results = array();
+        foreach ($ids as $id) {
+            $state = (string) get_post_meta($id, WPS3F_Offloader::META_STATE, true);
+            $has_local = (int) get_post_meta($id, WPS3F_Offloader::META_HAS_LOCAL_COPY, true);
+            $results[$id] = array(
+                'state'      => $state,
+                'has_local'  => 1 === $has_local,
+            );
+        }
+
+        wp_send_json_success($results);
     }
 
     /**

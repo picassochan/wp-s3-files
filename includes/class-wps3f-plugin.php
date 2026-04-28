@@ -132,6 +132,7 @@ class WPS3F_Plugin {
         add_action('admin_enqueue_scripts', array($this->media_library, 'enqueue_media_modal_filter_assets'));
         add_filter('wp_prepare_attachment_for_js', array($this->media_library, 'inject_attachment_js_meta'), 10, 3);
         add_action('admin_notices', array($this->media_library, 'render_upload_summary_notice'));
+        add_action('wp_ajax_wps3f_poll_status', array($this->media_library, 'ajax_poll_status'));
     }
 
     /**
