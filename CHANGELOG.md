@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-04-28
+
+### Changed
+
+- S3 status badges in media modal now also render in the attachment detail sidebar and after upload completion for immediate feedback.
+
 ## [0.1.5] - 2026-04-28
 
 ### Added
@@ -13,6 +19,15 @@ and versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   - Sync first: uploads to S3 immediately after file creation, falls back to WP-Cron on failure.
   - Async only: defers all uploads to WP-Cron, matching original behavior.
 - `WPS3F_SYNC_MODE` wp-config.php constant fallback.
+- **S3 status badges in media modal** — each attachment thumbnail shows a color-coded badge:
+  - Green "S3" / "S3 + Local" — successfully offloaded.
+  - Yellow "Pending" — queued for upload.
+  - Red "Failed" — upload failed, retry available.
+  - Gray "Local" — not yet offloaded.
+- **S3 status in attachment detail sidebar** — shows storage label and error message (if any) when an attachment is selected.
+- **Upload summary notice** — after uploading files, a dismissible admin notice shows how many files were uploaded to S3 and how many failed, with a link to the settings page for retries.
+- `wp_prepare_attachment_for_js` filter injects `wps3f` object (state, is_s3, has_local, label, error) into every media modal AJAX response.
+- `WPS3F_Media_Library::record_upload_result()` tracks upload outcomes in a short-lived transient.
 
 ## [0.1.4] - 2026-04-28
 
@@ -116,6 +131,7 @@ and versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 - Initial project scaffolding.
 
+[0.1.6]: https://github.com/picassochan/wp-s3-files/releases/tag/0.1.6
 [0.1.5]: https://github.com/picassochan/wp-s3-files/releases/tag/0.1.5
 [0.1.4]: https://github.com/picassochan/wp-s3-files/releases/tag/0.1.4
 [0.1.3]: https://github.com/picassochan/wp-s3-files/releases/tag/0.1.3

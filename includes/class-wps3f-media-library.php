@@ -12,6 +12,7 @@ class WPS3F_Media_Library {
     const STORAGE_ALL   = 'all';
     const STORAGE_S3    = 's3';
     const STORAGE_LOCAL = 'local';
+    const UPLOAD_STATS_TRANSIENT = 'wps3f_upload_stats';
 
     /**
      * @var WPS3F_Offloader
@@ -20,6 +21,127 @@ class WPS3F_Media_Library {
 
     public function __construct(WPS3F_Offloader $offloader) {
         $this->offloader = $offloader;
+    }
+
+    /**
+     * Inject S3 storage state into the media modal AJAX response.
+     *
+     * @param array<string,mixed> $response
+     * @param WP_Post             $attachment
+     * @param array<string,mixed> $meta
+     * @return array<string,mixed>
+     */
+    public function inject_attachment_js_meta(array $response, $attachment, $meta) {
+        $id     = (int) $attachment->ID;
+        $flags  = $this->offloader->get_storage_flags($id);
+        $state  = (string) get_post_meta($id, WPS3F_Offloader::META_STATE, true);
+        $error  = (string) get_post_meta($id, WPS3F_Offloader::META_ERROR, true);
+
+        $label = '—';
+        if ($flags['is_s3'] && $flags['has_local_copy']) {
+            $label = __('S3 + Local', 'wp-s3-files');
+        } elseif ($flags['is_s3']) {
+            $label = __('S3', 'wp-s3-files');
+        } elseif ($flags['has_local_copy']) {
+            $label = __('Local', 'wp-s3-files');
+        }
+
+        $response['wps3f'] = array(
+            'state'         => $state,
+            'is_s3'         => $flags['is_s3'],
+            'has_local'     => $flags['has_local_copy'],
+            'label'         => $label,
+            'error'         => $error,
+        );
+
+        return $response;
+    }
+
+    /**
+     * Record an offload result for the upload summary notice.
+     *
+     * @param int    $attachment_id
+     * @param bool   $success
+     * @param string $mode 'sync' or 'async'.
+     */
+    public static function record_upload_result($attachment_id, $success, $mode = 'sync') {
+        $stats = get_transient(self::UPLOAD_STATS_TRANSIENT);
+        if (!is_array($stats)) {
+            $stats = array('uploaded' => array(), 'failed' => array());
+        }
+
+        if ($success) {
+            $stats['uploaded'][] = array(
+                'id'        => (int) $attachment_id,
+                'mode'      => $mode,
+                'timestamp' => time(),
+            );
+        } else {
+            $stats['failed'][] = array(
+                'id'        => (int) $attachment_id,
+                'mode'      => $mode,
+                'timestamp' => time(),
+            );
+        }
+
+        // Keep only results from last 5 minutes.
+        $cutoff = time() - 300;
+        $stats['uploaded'] = array_values(array_filter($stats['uploaded'], function ($e) use ($cutoff) {
+            return $e['timestamp'] > $cutoff;
+        }));
+        $stats['failed'] = array_values(array_filter($stats['failed'], function ($e) use ($cutoff) {
+            return $e['timestamp'] > $cutoff;
+        }));
+
+        set_transient(self::UPLOAD_STATS_TRANSIENT, $stats, 300);
+    }
+
+    /**
+     * Show upload summary notice on upload.php.
+     */
+    public function render_upload_summary_notice() {
+        if (!is_admin() || !current_user_can('manage_options')) {
+            return;
+        }
+
+        global $pagenow;
+        if ('upload.php' !== $pagenow && 'post.php' !== $pagenow && 'post-new.php' !== $pagenow) {
+            return;
+        }
+
+        $stats = get_transient(self::UPLOAD_STATS_TRANSIENT);
+        if (!is_array($stats)) {
+            return;
+        }
+
+        $uploaded = count($stats['uploaded']);
+        $failed   = count($stats['failed']);
+
+        if (0 === $uploaded && 0 === $failed) {
+            return;
+        }
+
+        $messages = array();
+        if ($uploaded > 0) {
+            $messages[] = sprintf(
+                __('S3: %d file(s) uploaded successfully.', 'wp-s3-files'),
+                $uploaded
+            );
+        }
+        if ($failed > 0) {
+            $messages[] = sprintf(
+                __('S3: %d file(s) failed to upload. You can retry from the settings page.', 'wp-s3-files'),
+                $failed
+            );
+        }
+
+        $type = $failed > 0 ? 'warning' : 'success';
+        printf(
+            '<div class="notice notice-%s is-dismissible wps3f-upload-notice"><p><strong>%s</strong> %s</p></div>',
+            esc_attr($type),
+            esc_html__('WP S3 Files', 'wp-s3-files'),
+            implode(' ', array_map('esc_html', $messages))
+        );
     }
 
     /**
@@ -216,6 +338,87 @@ class WPS3F_Media_Library {
 JS;
 
         wp_add_inline_script('media-views', $script);
+
+        // CSS for S3 status badge on attachment thumbnails.
+        $css = <<<'CSS'
+.wps3f-badge{position:absolute;bottom:4px;right:4px;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600;color:#fff;z-index:10;pointer-events:none;line-height:1.4;text-shadow:0 1px 1px rgba(0,0,0,.2)}.wps3f-badge--offloaded{background:#00a32a}.wps3f-badge--pending{background:#dba617}.wps3f-badge--failed{background:#d63638}.wps3f-badge--local{background:#646970}.wps3f-badge--detail{margin-left:8px;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:600;color:#fff}.attachment-info .wps3f-detail-row{margin-top:8px;font-size:12px;color:#50575e}
+CSS;
+        wp_add_inline_style('media-views', $css);
+
+        // JS to render S3 status badges on media modal thumbnails.
+        $badge_script = <<<'JS'
+(function($){
+    if (window.wps3fBadgeLoaded) return;
+    window.wps3fBadgeLoaded = true;
+
+    function badgeClass(state) {
+        if (state === 'offloaded') return 'wps3f-badge wps3f-badge--offloaded';
+        if (state === 'pending') return 'wps3f-badge wps3f-badge--pending';
+        if (state === 'failed') return 'wps3f-badge wps3f-badge--failed';
+        return 'wps3f-badge wps3f-badge--local';
+    }
+
+    function badgeText(wps3f) {
+        if (!wps3f) return 'Local';
+        if (wps3f.is_s3 && wps3f.has_local) return 'S3 + Local';
+        if (wps3f.is_s3) return 'S3';
+        if (wps3f.state === 'failed') return 'Failed';
+        if (wps3f.state === 'pending') return 'Pending';
+        return 'Local';
+    }
+
+    function addBadge($el, model) {
+        $el.find('.wps3f-badge').remove();
+        var wps3f = model.get('wps3f');
+        if (!wps3f) return;
+        var $thumb = $el.find('.thumbnail');
+        if ($thumb.length) {
+            $thumb.css('position','relative');
+            $('<span class="' + badgeClass(wps3f.state) + '">' + badgeText(wps3f) + '</span>').appendTo($thumb);
+        }
+    }
+
+    function addDetailBadge($el, model) {
+        $el.find('.wps3f-detail-row').remove();
+        var wps3f = model.get('wps3f');
+        if (!wps3f) return;
+        var cls = badgeClass(wps3f.state).replace('wps3f-badge', 'wps3f-badge--detail');
+        var html = '<div class="wps3f-detail-row"><strong>S3:</strong> <span class="' + cls + '">' + badgeText(wps3f) + '</span>';
+        if (wps3f.error) {
+            html += ' <span style="color:#d63638;margin-left:4px;">' + $('<span>').text(wps3f.error).html() + '</span>';
+        }
+        html += '</div>';
+        $el.find('.attachment-info .details').append(html);
+    }
+
+    $(document).on('attachment:ready', function(e, model) {
+        var $el = $('.attachment[data-id="' + model.get('id') + '"]');
+        if ($el.length) addBadge($el, model);
+    });
+
+    // Also hook into the Attachment Details sidebar view.
+    var origRender = wp.media.view.Attachment.Details.prototype.render;
+    wp.media.view.Attachment.Details.prototype.render = function() {
+        var result = origRender.apply(this, arguments);
+        if (this.model && this.model.get('wps3f')) {
+            addDetailBadge(this.$el, this.model);
+        }
+        return result;
+    };
+
+    // Re-render badges when selection changes (sidebar detail view).
+    if (wp.media && wp.media.frame) {
+        wp.media.frame.on('selection:toggle', function() {
+            var model = wp.media.frame.state().get('selection').first();
+            if (model) {
+                var $detail = $('.attachment-details');
+                if ($detail.length) addDetailBadge($detail, model);
+            }
+        });
+    }
+})(jQuery);
+JS;
+        wp_add_inline_script('media-views', $badge_script);
     }
 
     /**

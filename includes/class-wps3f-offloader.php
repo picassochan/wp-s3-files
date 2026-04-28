@@ -95,6 +95,8 @@ class WPS3F_Offloader {
         if ($this->is_sync_first()) {
             $ok = $this->offload_attachment($attachment_id);
 
+            WPS3F_Media_Library::record_upload_result($attachment_id, $ok, 'sync');
+
             if (!$ok && !wp_next_scheduled(self::CRON_HOOK, array($attachment_id))) {
                 $this->logger->debug('Sync offload failed, scheduled cron retry', array('attachment_id' => $attachment_id));
                 wp_schedule_single_event(time() + 30, self::CRON_HOOK, array($attachment_id));

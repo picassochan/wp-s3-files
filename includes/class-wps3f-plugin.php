@@ -130,6 +130,8 @@ class WPS3F_Plugin {
         add_filter('manage_upload_columns', array($this->media_library, 'add_storage_column'));
         add_action('manage_media_custom_column', array($this->media_library, 'render_storage_column'), 10, 2);
         add_action('admin_enqueue_scripts', array($this->media_library, 'enqueue_media_modal_filter_assets'));
+        add_filter('wp_prepare_attachment_for_js', array($this->media_library, 'inject_attachment_js_meta'), 10, 3);
+        add_action('admin_notices', array($this->media_library, 'render_upload_summary_notice'));
     }
 
     /**
